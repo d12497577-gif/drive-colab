@@ -1,0 +1,80 @@
+name: Build Flet Python App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  # --- بناء نسخة الأندرويد ---
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # خطوة حاسمة لمكتبة serious_python
+      - name: Prepare Serious Python Environment
+        run: |
+          # إنشاء مجلد حزم البايثون إذا لم يكن موجوداً
+          mkdir -p build/python_packages
+          # تعيين متغير البيئة المطلوب في ملف الـ Build الخاص بالمكتبة
+          echo "SERIOUS_PYTHON_SITE_PACKAGES=$(pwd)/build/python_packages" >> $GITHUB_ENV
+
+      - name: Build APK
+        # أضفنا العلم لتجاوز تحذيرات الإصدارات التي ظهرت لك سابقاً
+        run: flutter build apk --release --android-skip-build-dependency-validation
+
+      - name: Zip APK Result
+        run: |
+          cd build/app/outputs/flutter-apk/
+          zip -r ../../../android-app-release.zip app-release.apk
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: android-app-release.zip
+
+  # --- بناء نسخة الويب ---
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Zip Web Result
+        run: |
+          cd build/
+          zip -r ../web-release.zip web/
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release
+          path: web-release.zip
