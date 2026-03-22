@@ -5,11 +5,13 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# نحتاج لهذه الصلاحيات ليتمكن الـ Action من الكتابة ورفع الملفات لـ GitHub Pages
+permissions:
+  contents: write
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    # حدد هنا المجلد الذي يحتوي على ملف pubspec.yaml
-    # إذا كان المشروع في الجِذر مباشرة، امسح سطر defaults بالكامل
     defaults:
       run:
         working-directory: . 
@@ -44,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: . # تأكد من كتابة المسار الصحيح هنا أيضاً
+        working-directory: .
 
     steps:
       - uses: actions/checkout@v4
@@ -53,15 +55,19 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+      - name: upgrade puh
+        run: flutter pub upgrade --major-versions
 
       - name: Install Dependencies
         run: flutter pub get
 
+      # قمنا بإضافة base-href لتجنب مشاكل التوجيه (Routing) في روابط GitHub
       - name: Build Web
-        run: flutter build web --release
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      # هذه هي الخطوة التي تقوم بالنشر الفعلي لصفحات GitHub
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          name: web-release
-          path: build/web/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web # مجلد المخرجات بعد الـ Build
